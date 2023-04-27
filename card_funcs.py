@@ -1,120 +1,149 @@
-import sys
-
-import pydealer
-
-import copy
-
+import random
 from collections import Counter
 
 
-# pass a hand of cards and return the score
-def get_score(hand):
-    score = 0
-    # count the number of each suits and add points based on the total
-    for suit in pydealer.const.SUITS:
-        suit_counter = 0
-        for card in hand:
-            if card.suit == suit:
-                suit_counter += 1
-        if suit_counter == 0:
-            score += 5
-            # print("5 points for having zero " + j)
-        elif suit_counter == 1:
-            score += 2
-            # print("2 points for having one " + j)
-        elif suit_counter == 2:
-            score += 1
-            # print("1 point for having two " + j)
-        else:
-            continue
-    # count the face cards and add their points into the score
-    for d in hand:
-        if d.value == "Ace":
+class Card:
+    RANKS = {1: 'Ace', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9', 10: '10', 11: 'Jack',
+             12: 'Queen', 13: 'King'}
+    SUITS = {1: 'Diamonds', 2: 'Clubs', 3: 'Hearts', 4: 'Spades'}
+
+    def __init__(self, rank, suit):
+        self.rank = rank
+        self.suit = suit
+
+    def __str__(self):
+        return f"{Card.RANKS[self.rank]} of {Card.SUITS[self.suit]}"
+
+
+class Deck:
+    def __init__(self):
+        self.cards = []
+        for suit in range(1, 5):
+            for rank in range(1, 14):
+                self.cards.append(Card(rank, suit))
+
+    def shuffle(self):
+        random.shuffle(self.cards)
+
+    def pop(self):
+        return self.cards.pop()
+
+
+class Hand:
+    def __init__(self):
+        self.cards = []
+        self.score = 0
+
+    def add_card(self, card):
+        self.cards.append(card)
+
+    def calculate_score(self):
+        for card in self.cards:
+            self.score += self.get_card_score(card)
+
+    def get_card_score(self, card):
+        score = 0
+        if card.rank == 1:
             score += 4
-        # print("4 points for the " + str(d))
-        elif d.value == "Jack":
+        elif card.rank == 11:
             score += 1
-            # print("1 points for the " + str(d))
-        elif d.value == "Queen":
+        elif card.rank == 12:
             score += 2
-            # print("2 points for the " + str(d))
-        elif d.value == "King":
+        elif card.rank == 13:
             score += 3
-            # print("3 points for the " + str(d))
-        else:
-            continue
-    # print("\n" + str(score) + " points total\n")
-    return score
+
+        suits = [c.suit for c in self.cards]
+        if suits.count(card.suit) == 0:
+            score += 5
+        elif suits.count(card.suit) == 1:
+            score += 2
+        elif suits.count(card.suit) == 2:
+            score += 1
+
+        return score
+
+    def __str__(self):
+        sorted_cards = sorted(self.cards, key=lambda x: (x.suit, x.rank))
+        cards_str = "\n".join([str(card) for card in sorted_cards])
+        return f"Cards in hand:\n{cards_str}"
 
 
-# takes a counter with all scores/frequencies and sorts them into a new counter with the point scale and frequency
-def sort_scores(raw_score_counter):
-    points = Counter({"grand slam": 0, "small slam": 0, "game": 0, "part score": 0, "pass": 0})
-    for a, b in raw_score_counter.items():
-        if a > 35:
-            points.update({"grand slam": b})
-        elif a > 31:
-            points.update({"small Slam": b})
-        elif a > 25:
-            points.update({"game": b})
-        elif a > 19:
-            points.update({"part score": b})
-        else:
-            points.update({"pass": b})
-    return points
+def deal_cards(deck):
+    player1 = Hand()
+    player2 = Hand()
+
+    for i in range(13):
+        card = deck.pop()
+        player1.add_card(card)
+        card = deck.pop()
+        player2.add_card(card)
+
+    return player1, player2
 
 
-# pass the remaining deck and the number of simulations that you want to run as well as the players static score
-def partner_score(dealer_stack, n, p_score):
-    score_list = []
-    for i in range(n):
-        # not 100% percent sure this is needed but I was worried the function would modify the original stack
-        temp_deck = copy.deepcopy(dealer_stack)
-        # print line to verify that they length of the remaining deck is 39
-        # print(len(temp_deck))
-        # shuffle the temp deck
-        temp_deck.shuffle()
-        # deal 13 cards to the partner
-        partner_deck = temp_deck.deal(13)
-        # print line to verify partner deck was outputting correct hands and scores
-        # print(partner_deck)
-        # total the score for each iteration and add the static player score
-        hand_score = get_score(partner_deck) + p_score
-        # add the score from each iteration to a list
-        score_list.append(hand_score)
-    # return a counter container with the simulated scored and the number of times they occurred
-    return sort_scores(Counter(score_list))
+def rank_game_score(total_score):
+    if total_score >= 35:
+        return "Grand Slam"
+    elif total_score >= 31:
+        return "Small Slam"
+    elif total_score >= 25:
+        return "Game"
+    elif total_score >= 19:
+        return "Part Score"
+    else:
+        return "Pass"
 
 
-def new_game():
-    while True:
-        # creates a 52 card deck from pydealer
-        new_deck = pydealer.Deck()
-        # rank dictionary for easy reading output
-        new_ranks = {"suits": {"Spades": 4, "Hearts": 3, "Clubs": 2, "Diamonds": 1}}
-        # shuffle the deck
-        new_deck.shuffle()
-        # deal 13 cards to yourself
-        player_hand = new_deck.deal(13)
-        player_hand.sort(ranks=new_ranks)
-        # calculate your score
-        print("This is your hand :")
-        print(player_hand)
-        player_score = get_score(player_hand)
-        print("\n Your hand is worth {} points".format(player_score))
-        # number of simulations to run
-        monte_carlo = 1000
-        # get a container of all the scaled scores and their frequency
-        partner_simulation = partner_score(new_deck, monte_carlo, player_score)
-        print("\n After 1000 simulations, here is the estimated probability of each outcome:")
-        for value, count in partner_simulation.items():
-            chance = count / monte_carlo
-            print('{} {:.2%}'.format(value, chance))
-        while True:
-            r = input("Press 1 to run another simulation or 0 to exit")
-            if r == "1":
-                break
-            elif r == "0":
-                sys.exit()
-            else:
-                print("Bad input")
+def play_game():
+    deck = Deck()
+    deck.shuffle()
+
+    player1_hand = Hand()
+    player2_hand = Hand()
+
+    # Deal 13 cards to each player
+    for i in range(13):
+        player1_hand.add_card(deck.pop())
+        player2_hand.add_card(deck.pop())
+
+    # Score each player's hand
+    player1_hand.calculate_score()
+    player2_hand.calculate_score()
+    player1_score = player1_hand.score
+    player2_score = player2_hand.score
+
+    return player1_score + player2_score
+
+
+def play_multiple_games(num_games):
+    rank_counts = Counter()
+
+    for i in range(num_games):
+        # Create a new deck and shuffle it
+        deck = Deck()
+        deck.shuffle()
+
+        # Deal the cards to two players
+        player1_hand = Hand()
+        player2_hand = Hand()
+        for j in range(13):
+            player1_hand.add_card(deck.pop())
+            player2_hand.add_card(deck.pop())
+
+        # Calculate the score of each hand
+        player1_hand.calculate_score()
+        player2_hand.calculate_score()
+
+        # Rank the game score
+        total_score = player1_hand.score + player2_hand.score
+        rank = rank_game_score(total_score)
+
+        # Update the rank counts
+        rank_counts[rank] += 1
+
+    # Print the probability distribution for each rank
+    total_games = sum(rank_counts.values())
+    for rank, count in rank_counts.items():
+        probability = count / total_games
+        print(rank + ":", probability)
+
